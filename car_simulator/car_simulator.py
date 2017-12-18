@@ -3,13 +3,7 @@ import pygame
 import random
 from pygame.locals import *
 
-red = (255,0,0)
-green = (0,255,0)
-blue = (0,0,255)
-darkBlue = (0,0,128)
 white = (255,255,255)
-black = (0,0,0)
-pink = (255,200,200)
 
 DEBUG=False
 
@@ -193,7 +187,6 @@ class RoadCarManager(object):
         for car_i in hit_list:
             car_i.collision_update(car)
 
-
 # Initialize the game
 pygame.init()
 width, height = 480, 640
@@ -253,6 +246,7 @@ while not done:
     # Draw background
     screen.blit(road, road_loc)
 
+    # --- Process Input
     # Update divider line position (for illusion of a running car)
     if is_clicked(pygame.K_UP, keys, prev_keys): # up clicked
         car_speed += SPEED_UNIT
@@ -278,27 +272,23 @@ while not done:
         dash_start_y = (dash_start_y + car_speed) % (2 * dash_len)
     else:
         audio_car.stop()
+    prev_keys = keys
+    # ---
 
     road_car_mgr.run(car_speed)
-
     if DEBUG:
         for car_i in road_car_mgr.cars:
             print "road cars: ", car_i.rect.y, car_i.dy,
-
+    # Lanes
     draw_dashed_line(screen, white, (mid_x-40, dash_start_y), (mid_x-40, height), 5, dash_len)
     draw_dashed_line(screen, white, (mid_x+40, dash_start_y), (mid_x+40, height), 5, dash_len)
+    # Ego car
     screen.blit(car.get_image(), car.get_loc())
-    #screen.blit(road_car.image(), road_car.loc())
+    # Road cars
     road_car_mgr.cars.draw(screen)
-
     road_car_mgr.check_collision(car)
-
     # Update the screen
     pygame.display.flip()
 
     # Limit to 60 frames per second
     clock.tick(60)
-
-    # print car_speed, car.dy, road_car.dy
-
-    prev_keys = keys
