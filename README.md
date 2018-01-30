@@ -1,5 +1,8 @@
 # inverse_rl
 
+# Demo
+https://youtu.be/Psdee1S4YeY
+
 # Credits
 - Umar Syed. Apprenticeship learning test framework. http://www.umarsyed.me/
 - https://www.raywenderlich.com/24252/beginning-game-programming-for-teens-with-python
