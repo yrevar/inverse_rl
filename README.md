@@ -1,12 +1,8 @@
-# inverse_rl
+-![](http://williamorth1123.weebly.com/uploads/3/0/3/9/30394187/2553194_orig.gif)
+-<br>Under Construction!
 
-# Demo
-https://youtu.be/Psdee1S4YeY
+# Inverse RL
 
-# Credits
-- Umar Syed. Apprenticeship learning test framework. http://www.umarsyed.me/
-- https://www.raywenderlich.com/24252/beginning-game-programming-for-teens-with-python
-- http://soundbible.com/
-- http://www.wavsource.com/
-- https://www.pinterest.com/pin/448600812867616147
-- Daniel Simion. http://soundbible.com/2175-Street.html
+# Environments
+Highway simulator: https://youtu.be/Psdee1S4YeY
+MDP: https://github.com/yrevar/inverse_rl/environments/MDP.ipynb
