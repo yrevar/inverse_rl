@@ -5,4 +5,4 @@
 
 # Environments
 Highway simulator: https://youtu.be/Psdee1S4YeY  
-MDP: https://github.com/yrevar/inverse_rl/environments/MDP.ipynb  
+MDP: https://github.com/yrevar/inverse_rl/blob/master/environments/MDP.ipynb 
