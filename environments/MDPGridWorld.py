@@ -3,6 +3,8 @@ import numpy as np
 from mdptoolbox_wrapper import *
 import mdptoolbox
 
+BIG_NUM = 1e10
+
 class MDPGridWorld(object):
     """
     This is a nice approximation for all the complexity of the entire universe 
@@ -12,10 +14,9 @@ class MDPGridWorld(object):
     MARKER_CURR_STATE = '@'
     MARKER_FREE_SPACE = ' '
     TERMINAL_STATE = (-1, -1)
-    BIG_NUM = 1e10
     
     def __init__(self, grid, living_reward=-0.01, gamma=0.99, 
-                     action_noise_dist=[0.1, 0.8, 0.1], silent=True):
+                     action_noise_dist=[0.1, 0.8, 0.1], obstacle_reward=-BIG_NUM, silent=True):
         
         """
         Returns a grid world with input specifications. 
@@ -57,6 +58,7 @@ class MDPGridWorld(object):
         
         # Reward
         self.living_reward = living_reward
+        self.obstacle_reward = obstacle_reward
         self.R = np.asarray([self.reward(s_idx) for s_idx in range(self.nS)])
         
         # Discounting factor
@@ -132,7 +134,7 @@ class MDPGridWorld(object):
         if self.__is_terminal_cell(self.grid, r, c):
             return float(self.grid[r][c])
         elif self.grid[r][c] == self.MARKER_OBSTACLE:
-            return -self.BIG_NUM
+            return self.obstacle_reward
         else:
             return self.living_reward
         
@@ -149,7 +151,7 @@ class MDPGridWorld(object):
             for a_idx in range(nA):
                 
                 # For any action in terminal or absorbing state, we transition to absorbing state
-                if self.__is_terminal_state(self.grid, s_idx) or s_idx == self.absorbing_state_idx:
+                if self.__is_terminal_state(self.grid, s_idx) or s_idx == self.absorbing_state_idx or self.is_obstacle[s_idx]:
                     T[s_idx, a_idx, self.absorbing_state_idx] = 1.
                 else:
                     for k, (s_prime_idx, next_p) in enumerate(dynamics(s_idx, a_idx, a_noise_dist)):
@@ -233,7 +235,7 @@ class MDPGridWorld(object):
                 return self.get_random_state(avoid_obtacles=True)
         return s_idx
     
-    def sample_trajectories(self, M, init_state_idx="random", max_length=100, Pi="optimal", padding=True):
+    def sample_trajectories(self, M, init_state_idx="random", max_length=100, Pi="optimal", padding=True, avoid_obtacles=True):
         """
         Samples and returns T trajectories of the form 
             [ [(s0_0, a0_0, r0_0), ..., (s0_T, a0_T, r0_T)], [(s1_0, a1_0, r1_0), ..., (s1_T, a1_T, r1_T)], 
@@ -248,10 +250,10 @@ class MDPGridWorld(object):
         """
         tau_list = []
         for _ in range(M):
-            tau_list.append(self.sample_trajectory(init_state_idx, max_length, Pi, padding))
+            tau_list.append(self.sample_trajectory(init_state_idx, max_length, Pi, padding, avoid_obtacles))
         return tau_list
     
-    def sample_trajectory(self, init_state_idx="random", max_length=100, Pi="optimal", behavior_optimality=1., padding=True):
+    def sample_trajectory(self, init_state_idx="random", max_length=100, Pi="optimal", padding=True, avoid_obtacles=True, behavior_optimality=1.):
         """
         Samples a trajectory of the form [(s0, a0, r0), ..., (sT, aT, rT)]
         Input:
@@ -267,7 +269,7 @@ class MDPGridWorld(object):
         absorbing_state_idx = self.absorbing_state_idx
         
         # Initial state
-        s_idx = self.get_random_state(avoid_obtacles=True) if init_state_idx == "random" else  init_state_idx
+        s_idx = self.get_random_state(avoid_obtacles=avoid_obtacles) if init_state_idx == "random" else  init_state_idx
 
         # Initial policy
         if Pi == "random":    
