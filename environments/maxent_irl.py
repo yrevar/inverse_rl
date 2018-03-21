@@ -7,7 +7,9 @@ def softmax(x1, x2):
     return max_x + np.log(1 + np.exp(min_x - max_x))
 
 def StateLogPartitionFn(R, nS, nA, T, gamma, epsilon, phi):
-    """ 
+    """   
+    Implements Algorithm 1 from Zeibart et al. thesis (2010)
+    
     Softmax exploration:
         bair.berkeley.edu/blog/2017/10/06/soft-q-learning/
         home.deib.polimi.it/restelli/MyWebSite/pdf/rl5.pdf
@@ -128,7 +130,8 @@ def max_ent_irl(trajectories, state_idx_to_features, gamma, nA, dynamics_T, n_ep
         svf = compute_state_visitation_frequency(trajectories, nS, nA, dynamics_T, curr_R, gamma, phi, vi_eps, silent=True)
         grad = feature_expectations - augmented_feature_matrix.T.dot(svf)
         #if not silent: print(" theta:", [round(t,4) for t in theta])
-        if not silent: print(" grad:", [round(t,4) for t in grad], " sum|grad|: ", np.abs(grad).sum(), )
+        #if not silent: print(" grad:", [round(t,4) for t in grad], " sum|grad|: ", np.abs(grad).sum(), )
+        if not silent: print(" Epoch {}, sum|grad|: {}".format(i, np.abs(grad).sum()))
         theta += alpha * grad
     
     R = augmented_feature_matrix.dot(theta).reshape((nS,))

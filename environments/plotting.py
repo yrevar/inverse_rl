@@ -20,9 +20,9 @@ def plotR(R, h, w, title="", grid=None):
     plt.imshow(R.reshape(h,w))
     plt.title(title)
     
-def compare_grid_data(R1, R2, h, w, title1="Original", title2="Recovered", suffix="Reward", grid=None):
+def compare_grid_data(R1, R2, h, w, title1="Original", title2="Recovered", suffix="Reward", grid=None, plots=[(1,2,1), (1,2,2)]):
     
-    plt.subplot(1,2,1)
+    plt.subplot(*plots[0])
     plotR(R1, h, w, title1+" "+suffix, grid)
-    plt.subplot(1,2,2)
+    plt.subplot(*plots[1])
     plotR(R2, h, w, title2+" "+suffix, grid)
