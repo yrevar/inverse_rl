@@ -15,8 +15,13 @@ class MDPGridWorld(object):
     MARKER_FREE_SPACE = ' '
     TERMINAL_STATE = (-1, -1)
     
-    def __init__(self, grid, living_reward=-0.01, gamma=0.99, 
-                     action_noise_dist=[0.1, 0.8, 0.1], obstacle_reward=-BIG_NUM, silent=True):
+    def __init__(self, grid, 
+                     living_reward=-0.01, 
+                     gamma=0.99, 
+                     action_noise_dist=[0.1, 0.8, 0.1], 
+                     obstacle_reward=-BIG_NUM, 
+                     visit_obstacles=False,
+                     silent=True):
         
         """
         Returns a grid world with input specifications. 
@@ -29,6 +34,9 @@ class MDPGridWorld(object):
         self.grid = grid.copy()
         self.width = len(grid[0])
         self.height = len(grid)
+        
+        # Visit obstacles?
+        self.visit_obstacles = visit_obstacles # likelihood of visit under optimal policy will depend on obstacle's relative reward
         
         # States
         self.curr_state_idx, self.states, self.is_obstacle, self.is_terminal, self.r_max, self.r_min \
@@ -65,7 +73,7 @@ class MDPGridWorld(object):
         self.gamma = gamma
         
         # Transition probability T(S, A, S')
-        self.T = self.compute_transition_probability_matrix(self.nS, self.nA, 
+        self.T, self.R_mat = self.compute_transition_probability_and_reward_matrix(self.nS, self.nA, 
                                                             self.action_noise_dist, self.simple_r_n_dynamics) 
         
         # For visualization purpose
@@ -142,23 +150,31 @@ class MDPGridWorld(object):
         """
         Returns: the next state (index) from executing stochastic a_idx in s_idx
         """
-        return np.random.choice(self.state_idxs, p=self.T[s_idx, a_idx])
         
-    def compute_transition_probability_matrix(self, nS, nA, a_noise_dist, dynamics):
+        s_prime_idx = np.random.choice(self.state_idxs, p=self.T[s_idx, a_idx])
+        return s_prime_idx, self.R[s_prime_idx]
+        
+    def compute_transition_probability_and_reward_matrix(self, nS, nA, a_noise_dist, dynamics):
         
         T = np.zeros((nS, nA, nS))
+        R = np.zeros((nS, nA, nS))
         for s_idx in self.state_idxs: # no transitions from absorbing state
             for a_idx in range(nA):
                 
                 # For any action in terminal or absorbing state, we transition to absorbing state
-                if self.__is_terminal_state(self.grid, s_idx) or s_idx == self.absorbing_state_idx or self.is_obstacle[s_idx]:
+                if self.__is_terminal_state(self.grid, s_idx):
                     T[s_idx, a_idx, self.absorbing_state_idx] = 1.
+                    R[s_idx, a_idx, self.absorbing_state_idx] = 0.
+                elif s_idx == self.absorbing_state_idx:
+                    T[s_idx, a_idx, self.absorbing_state_idx] = 1.
+                    R[s_idx, a_idx, self.absorbing_state_idx] = 0.
                 else:
-                    for k, (s_prime_idx, next_p) in enumerate(dynamics(s_idx, a_idx, a_noise_dist)):
-                        T[s_idx, a_idx][s_prime_idx] = next_p
-        return T
+                    for k, (s_prime_idx, next_p) in enumerate(dynamics(s_idx, a_idx, a_noise_dist, self.visit_obstacles)):
+                        T[s_idx, a_idx][s_prime_idx] = next_p # SxAxS' transition prob
+                        R[s_idx, a_idx][s_prime_idx] = self.reward(s_prime_idx) # SxAxS' reward
+        return T, R
     
-    def simple_r_n_dynamics(self, s_idx, a_idx, a_noise_dist):
+    def simple_r_n_dynamics(self, s_idx, a_idx, a_noise_dist, visit_obstacles):
         """
         Implements dynamics as specified for toy mdp gridworld in R&N chap. 17
         Returns: Returns transition probabilities for taking stochastic action a_idx in state s_idx
@@ -183,22 +199,23 @@ class MDPGridWorld(object):
             new_r, new_c = r+dr, c+dc
             if new_r < 0 or new_r >= self.height \
                 or new_c < 0 or new_c >= self.width \
-                or self.grid[new_r][new_c] == self.MARKER_OBSTACLE:
+                or (self.grid[new_r][new_c] == self.MARKER_OBSTACLE and visit_obstacles == False):
                     new_r, new_c = r, c
-                    
+            
             if self.state_to_idx[(new_r, new_c)] in next_state_to_prob:
                 next_state_to_prob[self.state_to_idx[(new_r, new_c)]] += p
             else:
                 next_state_to_prob[self.state_to_idx[(new_r, new_c)]] = p
-            
+        
         return next_state_to_prob.items()
-    
+        
     def _get_optimal_policy(self):
         """
         Returns: Optimal Policy Pi(s) for all s
         """
         if 'vi_results' not in dir(self):
             self.vi_results = run_value_iteration(self.T, self.R, self.gamma)
+            #self.vi_results = run_value_iteration(self.T, self.R_mat.transpose(1,0,2), self.gamma) # R in AxSxS' form for mdptoolboxs
             
         return np.asarray(self.vi_results.policy).copy()
     
@@ -235,7 +252,7 @@ class MDPGridWorld(object):
                 return self.get_random_state(avoid_obtacles=True)
         return s_idx
     
-    def sample_trajectories(self, M, init_state_idx="random", max_length=100, Pi="optimal", padding=True, avoid_obtacles=True):
+    def sample_trajectories(self, M, init_state_idx="random", max_length=100, Pi="optimal", padding=True, visit_obstacles_as_init=False):
         """
         Samples and returns T trajectories of the form 
             [ [(s0_0, a0_0, r0_0), ..., (s0_T, a0_T, r0_T)], [(s1_0, a1_0, r1_0), ..., (s1_T, a1_T, r1_T)], 
@@ -250,10 +267,10 @@ class MDPGridWorld(object):
         """
         tau_list = []
         for _ in range(M):
-            tau_list.append(self.sample_trajectory(init_state_idx, max_length, Pi, padding, avoid_obtacles))
+            tau_list.append(self.sample_trajectory(init_state_idx, max_length, Pi, padding, visit_obstacles_as_init))
         return tau_list
     
-    def sample_trajectory(self, init_state_idx="random", max_length=100, Pi="optimal", padding=True, avoid_obtacles=True, behavior_optimality=1.):
+    def sample_trajectory(self, init_state_idx="random", max_length=100, Pi="optimal", padding=True, visit_obstacles_as_init=False, behavior_optimality=1.):
         """
         Samples a trajectory of the form [(s0, a0, r0), ..., (sT, aT, rT)]
         Input:
@@ -269,7 +286,7 @@ class MDPGridWorld(object):
         absorbing_state_idx = self.absorbing_state_idx
         
         # Initial state
-        s_idx = self.get_random_state(avoid_obtacles=avoid_obtacles) if init_state_idx == "random" else  init_state_idx
+        s_idx = self.get_random_state(avoid_obtacles=not visit_obstacles_as_init) if init_state_idx == "random" else  init_state_idx
 
         # Initial policy
         if Pi == "random":    
@@ -290,8 +307,8 @@ class MDPGridWorld(object):
             else:
                 a_idx = Pi[s_idx]
                 
-            s_prime_idx = self.sample_next_state(s_idx, a_idx)
-            tau.append((s_idx, a_idx, self.R[s_prime_idx]))
+            s_prime_idx, reward_prime = self.sample_next_state(s_idx, a_idx)
+            tau.append((s_idx, a_idx, reward_prime)) # reward_prime includes penalty of visiting obstacles or crossing boundary
             if s_idx == self.absorbing_state_idx: #self._is_terminal(s_idx):
                 # Reached terminal state, terminate trajectory here
                 break
@@ -299,7 +316,7 @@ class MDPGridWorld(object):
         
         if padding:
             for j in range(i, max_length):
-                tau.append((s_idx, a_idx, self.R[s_prime_idx]))
+                tau.append((s_idx, a_idx, reward_prime))
         return tau
     
     def interpret_trajectory(self, tau):
@@ -321,7 +338,8 @@ class MDPGridWorld(object):
         """
         self.state_values_dict = {self.states[i]: state_values[i] for i in range(len(state_values))}
         
-        msg = ''
+        line = "".join(['-'] * 3 * self.width) + "\n"
+        msg = ""
         cell_filler = "_"
         grid = self.grid
         for r in range(self.height):
@@ -335,8 +353,14 @@ class MDPGridWorld(object):
         
         if display_absorbing and len(state_values)-1 == self.absorbing_state_idx:
             msg += "Absorbing state: " + formatting(state_values[-1])
-        print(msg)
-        
+        print(line + msg + "\n"+ line)
+    
+    def disp_policy(self, policy):
+        self.disp_custom_grid(policy, lambda x: "{:}".format(self.actions_name[x]))
+    
+    def disp_values(self, values):
+        self.disp_custom_grid(values, lambda x: "{:.3f}".format(x))
+    
     def get_state_representation_2d(self, s_idx):
         
         msg, cell_filler = '', "_"
@@ -357,12 +381,13 @@ class MDPGridWorld(object):
                 msg += "{txt:{fill}^5s}\t".format(txt=tt, fill=cell_filler)
             msg += "\n"
         return msg
+    
     def __str__(self):
         return self.get_state_representation_2d(self.curr_state_idx)
 
 # Mdptoolbox utils
 def run_value_iteration(T, R, gamma, *args, **kwarg):
-    T = T.transpose(1,0,2)
+    T = T.transpose(1,0,2) # T in AxSxS' form for mdptoolbox
     vi = mdptoolbox.mdp.ValueIteration(T, R, gamma, *args, **kwarg)
     vi.run()
     return vi

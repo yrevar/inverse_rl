@@ -109,7 +109,7 @@ def compute_state_visitation_frequency(trajectories, nS, nA, dynamics_T, R, gamm
     # summing up along t gives us total state visitation frequency for max length of trajetory
     return mu_t_s.sum(axis=0)
 
-def max_ent_irl(trajectories, state_idx_to_features, gamma, nA, dynamics_T, n_epochs, alpha, phi, vi_eps=1e-10, silent=True):
+def max_ent_irl(trajectories, state_idx_to_features, gamma, nA, dynamics_T, n_epochs, alpha, phi, vi_eps=1e-10, epoch_summary_rate=None):
     
     augmented_feature_matrix = state_idx_to_features
     
@@ -129,11 +129,11 @@ def max_ent_irl(trajectories, state_idx_to_features, gamma, nA, dynamics_T, n_ep
         curr_R = augmented_feature_matrix.dot(theta)
         svf = compute_state_visitation_frequency(trajectories, nS, nA, dynamics_T, curr_R, gamma, phi, vi_eps, silent=True)
         grad = feature_expectations - augmented_feature_matrix.T.dot(svf)
-        #if not silent: print(" theta:", [round(t,4) for t in theta])
-        #if not silent: print(" grad:", [round(t,4) for t in grad], " sum|grad|: ", np.abs(grad).sum(), )
-        if not silent: print(" Epoch {}, sum|grad|: {}".format(i, np.abs(grad).sum()))
+        
+        if epoch_summary_rate is not None and ((i+1)%epoch_summary_rate == 0 or i==n_epochs-1):
+            print(" Epoch {}, sum|grad|: {}".format(i+1, np.abs(grad).sum()))
         theta += alpha * grad
     
     R = augmented_feature_matrix.dot(theta).reshape((nS,))
-    R[-1] = 0 # ignore absorbing state reward
+    #R[-1] = 0 # ignore absorbing state reward
     return R
