@@ -17,7 +17,7 @@ def plotR(R, h, w, title="", grid=None):
                 i += 1
         R = np.asarray(R2)
     
-    plt.imshow(R.reshape(h,w))
+    plt.imshow(R.reshape(h,w), cmap='gray')
     plt.title(title)
     
 def compare_grid_data(R1, R2, h, w, title1="Original", title2="Recovered", suffix="Reward", grid=None, plots=[(1,2,1), (1,2,2)]):
