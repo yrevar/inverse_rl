@@ -7,21 +7,22 @@ from simple_rl.tasks.grid_world.GridWorldStateClass import GridWorldState
 # FLH: feature lookahead heap
 def get_FLH(state, nA, phi, T, actions, h):
 
-    frontier = [(state, 0, 0)] # for i, a in enumerate(range(len(actions)))] # BFS frontier: [(state, heap_idx, depth), ...]
-    heap = [state] # for a in range(len(actions))]
+    # BFS frontier: [(state, heap_idx, depth), ...]
+    frontier = [(0, state, 0)] #[(i, T(state, a), 0)  for i, a in enumerate(actions)]
+    heap = [state] #[T(state, a) for a in actions]
     # parent_idx = [-1]
-    depths = [0] # for a in range(len(actions))]
-    idx = 0
+    depths = [0] #[0  for a in actions]
+    idx = 1 #len(actions)
 
     while len(frontier) != 0:
-        state, heap_idx, d = frontier.pop(0)
 
+        heap_idx, state, d = frontier.pop(0)
         if d >= h:
             break
 
         for a in actions:
             state_prime = T(state, a)
-            frontier.append((state_prime, idx+1, d+1))
+            frontier.append((idx, state_prime, d+1))
             heap.append(state_prime)
             depths.append(d+1)
             # parent_idx.append(heap_idx)
@@ -35,13 +36,10 @@ def get_FLH(state, nA, phi, T, actions, h):
     This is done to process feature tree layer wise from bottom to top. We start at bottom layer, and compute V, Q, and Pi; and then use those values to compute V,Q, and Pi of featues at layer above it.
     """
     heap_size = len(features_heap)
-    FLH_to_layers = []
-    phi_s_dim = len(features_heap[0])
-    for i in range(h)[::-1]:
-        start, end = int(nA*(1-nA**(i))/(1-nA))+1, int(nA*(1-nA**(i+1))/(1-nA))+1
-        phi_i_tiled = np.repeat(features_heap[features_depth.squeeze() == i], nA, axis=0)
-        phi_i_tiled_pad = np.vstack((np.zeros((start,phi_s_dim)), phi_i_tiled, np.zeros((heap_size-end,phi_s_dim))))
-        FLH_to_layers.append(phi_i_tiled_pad)
+    FLH_to_layers = np.array([np.where(features_depth.reshape(-1,1) == i+1,
+                                       features_heap,
+                                       np.zeros_like(features_heap))
+                              for i in range(h)][::-1])
     return FLH_to_layers, features_heap, features_depth
 
 # For debugging purpose
@@ -88,6 +86,16 @@ def compute_cell_values(nvmdp, SFT_full, heap_size, nA, w_r, tf_graph):
             v_map[row, col] = RHC_value(SFT_full[GridWorldState(x, y)], heap_size, nA, w_r, tf_graph)[0][0]
     return v_map
 
+# This is done to speed up RHC value over full state space
+def compute_full_SFT(nvmdp, nA, phi, h):
+    SFT_full = {}
+    for row in range(nvmdp.height):
+        for col in range(nvmdp.width):
+            x, y = nvmdp._rowcol_to_xy(row, col)
+            state = GridWorldState(x, y)
+            SFT_full[state] = get_FLH(state, nA, phi, nvmdp.transition_func, nvmdp.actions, h)[0]
+    return SFT_full
+
 def RHC_policy(SFT, heap_size, nA, w_r, tf_graph):
 
     with tf.Session(graph=tf_graph) as sess:
@@ -95,7 +103,8 @@ def RHC_policy(SFT, heap_size, nA, w_r, tf_graph):
         pi = sess.run(fetches=["pi_out:0"],
                       feed_dict={"state_feature_tree:0": SFT,
                                  "pi_init:0": np.zeros((heap_size, nA), np.float32),
-                                 "v_init:0": SFT[0].dot(w_r).squeeze()})
+                                 "v_init:0": np.zeros(heap_size, dtype=np.float32)})
+                                 #"v_init:0": SFT[0].dot(w_r).squeeze()})
         return pi
 
 def RHC_value(SFT, heap_size, nA, w_r, tf_graph):
@@ -105,7 +114,8 @@ def RHC_value(SFT, heap_size, nA, w_r, tf_graph):
         v = sess.run(fetches=["v_out:0"],
                      feed_dict={"state_feature_tree:0": SFT,
                                 "pi_init:0": np.zeros((heap_size, nA), np.float32),
-                                "v_init:0": SFT[0].dot(w_r).squeeze()})
+                                "v_init:0": np.zeros(heap_size, dtype=np.float32)})
+                                #"v_init:0": SFT[0].dot(w_r).squeeze()})
         return v
 
 def RHC_rollout(nvmdp, state, phi, horizon, heap_size, w_r, tf_graph, max_traj_len):
@@ -169,6 +179,7 @@ def build_rhirl_graph(heap_size, nA, phi_s_dim, gamma, h):
             R = tf.matmul(Phi_S, W_r, name="R")
             V_next = tf.expand_dims(V.read(i, name="V_next"), -1)
             Q_h = tf.reshape(tf.squeeze(tf.add(R, tf.multiply(gamma, V_next), name="Q"))[1:], (-1, nA), "Q_sa_reshaped")
+            # Q_h = tf.reshape(tf.squeeze(tf.add(R, tf.multiply(gamma, V_next), name="Q")), (-1, nA), "Q_sa_reshaped")
             Pi_h = tf.nn.softmax(Q_h, axis=-1, name="Pi_h")
             V_h = tf.squeeze(tf.pad(tf.reshape(
                     tf.reduce_sum(tf.multiply(Q_h, Pi_h), axis=-1, name="V"), [-1,1]), [[0, V_pad], [0, 0]], 'CONSTANT'))
@@ -182,6 +193,7 @@ def build_rhirl_graph(heap_size, nA, phi_s_dim, gamma, h):
                                      clear_after_read=False, infer_shape=False, name="V_array")
             V = V.write(0,  V_init, name="V_array_0")
             V_pad = tf.constant( int(( nA * (1-nA**(h))/(1-nA) ) - ( nA * (1-nA**(h-1))/(1-nA) )), dtype=tf.int32)
+            # V_pad = tf.constant( int(( nA * (1-nA**(h))/(1-nA) ) - ( nA * (1-nA**(h-1))/(1-nA) )), dtype=tf.int32) - 1
             loop_cond = lambda W_r, V, nA, Pi, V_pad, sft, i: tf.less(i, h, name="compute_value_end")
             W_r, V, nA, Pi, V_pad, sft, i = tf.while_loop(loop_cond, ComputeValue, [W_r, V, nA, Pi, V_pad, tf_sft, 0],
                                                       parallel_iterations=1, name="compute_value_loop")
@@ -203,7 +215,7 @@ def build_rhirl_graph(heap_size, nA, phi_s_dim, gamma, h):
         prob_summary = tf.summary.scalar('psa_summary', Pi_out[0, action_idx])
         Pi_out = tf.identity(Pi_out, name="pi_out")
         W_grad = tf.identity(W_grad, name="grad_w_r")
-        # V_out_stack = tf.identity(V_out.stack(), name="v_out_stack")
+        V_out_stack = tf.identity(V_out.stack(), name="v_out_stack")
         V_out = tf.identity(V_out.read(h), name="v_out")
         saver = tf.train.Saver()
     return g, saver
