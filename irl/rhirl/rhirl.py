@@ -163,7 +163,7 @@ def build_rhirl_graph(heap_size, nA, phi_s_dim, gamma, h):
 
     g = tf.Graph()
     with g.as_default():
-        def ComputeValue(W_r, V, nA, Pi, V_pad, tf_sft, i, bmann_beta=1.0):
+        def ComputeValue(W_r, V, nA, Pi, V_pad, tf_sft, i):
 
             Phi_S = tf.gather(tf_sft, i)
             R = tf.matmul(Phi_S, W_r, name="R")
