@@ -215,8 +215,8 @@ def rhirl_train(SFT, phi_s_dim, heap_size,
     rhc_traj_ss_list = []
 
     if w_init is None:
-        # w_init = np.zeros((phi_s_dim, 1)).astype(np.float32)
-        w_init =np.random.uniform(0, 0.01, (phi_s_dim, 1)).astype(np.float32)
+        w_init = np.zeros((phi_s_dim, 1)).astype(np.float32)
+        # w_init = np.random.uniform(0, 0.01, (phi_s_dim, 1)).astype(np.float32)
     with tf.Session(graph=tf_graph) as sess:
 
         if restore and saver is not None:
@@ -248,8 +248,8 @@ def rhirl_train(SFT, phi_s_dim, heap_size,
                     #     action = np.random.randint(nA)
                     # else:
                     action = D_actions[t_i][s_i]
-                    v_last = SFT[state][0].dot(w).squeeze()
-                    # v_last = np.zeros(heap_size, dtype=np.float32)
+                    # v_last = SFT[state][0].dot(w).squeeze()
+                    v_last = np.zeros(heap_size, dtype=np.float32)
                     feed_dict = {"state_feature_tree:0": SFT[state],
                                  "action_idx:0": action,
                                  "learning_rate:0":lr,
