@@ -118,13 +118,13 @@ def RHC_value(SFT, heap_size, nA, w_r, tf_graph):
                                 #"v_init:0": SFT[0].dot(w_r).squeeze()})
         return v
 
-def RHC_rollout(nvmdp, state, phi, horizon, heap_size, w_r, tf_graph, max_traj_len):
+def RHC_rollout(nvmdp, state, phi, horizon, heap_size, w_r, tf_graph, max_steps):
 
     state_seq = [state]
     action_seq = []
     nA = len(nvmdp.actions)
 
-    for i in range(max_traj_len):
+    for i in range(max_steps):
         if (state.x, state.y) in nvmdp.goal_locs:
             break
         action = nvmdp.actions[np.argmax(\
@@ -147,22 +147,22 @@ def get_in_sample_data(n, D_traj_states, D_traj_actions, repetition=False, init_
     else:
         return [D_traj_states[i][np.random.randint(len(D_traj_states[i]))] for i in np.random.randint(0, len(D_traj_states), n)]
 
-def run_rhc_test(nvmdp, n_test, phi, H, heap_size, w, tf_graph, max_traj_len=50):
+def run_rhc_test(nvmdp, n_test, phi, H, heap_size, w, tf_graph, max_steps=50):
     rhc_behavior = {}
     rhc_traj_ss, rhc_traj_as = [], []
     for init_state in nvmdp.sample_empty_states(n_test):
-        states, actions = RHC_rollout(nvmdp, init_state, phi, H, heap_size, w, tf_graph, max_traj_len)
+        states, actions = RHC_rollout(nvmdp, init_state, phi, H, heap_size, w, tf_graph, max_steps)
         for i in range(len(states)-1):
             rhc_behavior[states[i]] = actions[i]
         rhc_traj_ss.append(states)
         rhc_traj_as.append(actions)
     return rhc_traj_ss, rhc_traj_as, rhc_behavior
 
-def run_rhc_train(nvmdp, D_traj_states, D_traj_actions, phi, H, heap_size, w, tf_graph, max_traj_len=50):
+def run_rhc_train(nvmdp, D_traj_states, D_traj_actions, phi, H, heap_size, w, tf_graph, max_steps=50):
     rhc_behavior = {}
     rhc_traj_ss, rhc_traj_as = [], []
     for init_state in get_in_sample_data(len(D_traj_states), D_traj_states, D_traj_actions, init_only=True):
-        states, actions = RHC_rollout(nvmdp, init_state, phi, H, heap_size, w, tf_graph, max_traj_len)
+        states, actions = RHC_rollout(nvmdp, init_state, phi, H, heap_size, w, tf_graph, max_steps)
         for i in range(len(states)-1):
             rhc_behavior[states[i]] = actions[i]
         rhc_traj_ss.append(states)
@@ -210,7 +210,7 @@ def build_rhirl_graph(heap_size, nA, phi_s_dim, gamma, h):
         log_likelihood = -tf.log(Pi_out[0, action_idx])
         W_grad = tf.gradients(log_likelihood, W_r)
         adam = tf.train.AdamOptimizer(learning_rate=lr)
-        # adam = tf.train.GradientDescentOptimizer(learning_rate=lr)
+        # sgd = tf.train.GradientDescentOptimizer(learning_rate=lr)
         updateWeights = adam.apply_gradients(zip(W_grad, [W_r]), name="update_w_r")
         prob_summary = tf.summary.scalar('psa_summary', Pi_out[0, action_idx])
         Pi_out = tf.identity(Pi_out, name="pi_out")
