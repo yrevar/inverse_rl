@@ -92,12 +92,18 @@ def upsample(series, resample_rate, upsample_rate):
     interpolated = series.resample(resample_rate).interpolate(method="linear")
     return interpolated.resample(upsample_rate).mean()
 
-def upsample_taxi_df(df, resample_rate='S', upsample_rate='5S'):
-    """ Upsamples data
+def upsample_df(df, columns, resample_rate='S', upsample_rate='5S'):
+    """ Upsamples specified columns of the data frame
     """
-    resampled_df = pd.concat([upsample(df["longitude"], resample_rate, upsample_rate),
-                              upsample(df["latitude"], resample_rate, upsample_rate)], axis=1)
-    return resampled_df.reindex(columns=df.columns)
+    df_cols = []
+    for c in df:
+        if c in columns:
+            df_cols.append(upsample(df[c], resample_rate, upsample_rate))
+        else:
+            df_cols.append(df[c])
+
+    resampled_df = pd.concat(df_cols, axis=1)
+    return resampled_df.reindex(columns=df.columns).reset_index()
 
 def get_heading_and_distance(df):
     diff = df.diff(1)
