@@ -1,5 +1,6 @@
 import abc
 
+
 class IRLProblem(abc.ABC):
 
     @abc.abstractmethod

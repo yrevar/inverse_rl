@@ -13,7 +13,9 @@ image = Image.open(buffer)
 plt.imshow(image)
 """
 
-def request_image_by_query(query, zoom=18, size="100x100", maptype="satellite", api_key=""):
+
+def request_image_by_query(query, zoom=18, size="100x100",
+                           maptype="satellite", api_key=""):
     """
     Adapted from: http://drwelby.net/gstaticmaps/
     center= lat, lon or address
@@ -22,27 +24,47 @@ def request_image_by_query(query, zoom=18, size="100x100", maptype="satellite", 
     language= language code
     visible= locations
     """
-    url = "http://maps.googleapis.com/maps/api/staticmap?center={}&size={}&zoom={}&sensor=false&maptype={}&style=feature%3Aall%7Celement%3Alabels%7Cvisibility%3Aoff&key={}".format(query, size, zoom, maptype, api_key)
+    url = "http://maps.googleapis.com/maps/api/staticmap?center={}&size={}&zoom={}&sensor=false&maptype={}&style=feature%3Aall%7Celement%3Alabels%7Cvisibility%3Aoff&key={}".format(
+        query, size, zoom, maptype, api_key)
     img = Image.open(BytesIO(request.urlopen(url).read()))
     return np.array(img.convert("RGB")), url
 
-def request_image_by_lat_lng(lat, lng, zoom=18,
-                                size="100x100", maptype="satellite",
-                                api_key=""):
-    return request_image_by_query("{},{}".format(lat,lng), zoom, size, maptype, api_key)
 
-def download_state_features(latitude_levels, longitude_levels, to_dir,
-                            size="32x32", zoom=18, maptype="satellite",
-                            api_key=""):
-    data_dir = os.path.join(to_dir, "imgs_" + size)
-    os.makedirs(data_dir, exist_ok=True)
-    print("Download started...")
+def request_image_by_lat_lng(lat, lng, zoom=18,
+                             size="100x100", maptype="satellite",
+                             api_key=""):
+    return request_image_by_query("{},{}".format(lat, lng),
+                                  zoom, size, maptype, api_key)
+
+
+def get_image_file_prefix(feature_params):
+
+    data_dir = feature_params["data_dir"]
+    size = feature_params["img_size"]
+    maptype = feature_params["img_type"]
+    zoom = feature_params["img_zoom"]
+
+    store_dir = os.path.join(data_dir, "imgs_" + size)
+    return os.path.join(store_dir, maptype[:3] + "img_zm_" + str(zoom) +
+                        "_sz_" + size + "_latlng_")
+
+
+def download_state_features(latitude_levels, longitude_levels, feature_params):
+
+    size = feature_params["img_size"]
+    maptype = feature_params["img_type"]
+    zoom = feature_params["img_zoom"]
+    api_key = feature_params["gmaps_api_key"]
+    file_prefix = get_image_file_prefix(feature_params)
+    store_dir = os.path.dirname(file_prefix)
+
+    os.makedirs(store_dir, exist_ok=True)
+    print("Downloading images @ {}_<lat>_<lng>.jpg".format(file_prefix))
     for lat in latitude_levels:
         for lng in longitude_levels:
-
-            img = request_image_by_lat_lng(lat, lng, zoom, size, maptype, api_key)[0]
-            Image.fromarray(img).save(
-                    os.path.join(data_dir,
-                                 "satimg_zm_" + str(zoom) + "_sz_" + size +  "_latlng_" + str(lat) + "_" + str(lng) + ".jpg"))
+            img = request_image_by_lat_lng(lat, lng,
+                                           zoom, size, maptype, api_key)[0]
+            Image.fromarray(img).save(file_prefix
+                                      + str(lat) + "_" + str(lng) + ".jpg")
     print("Download finished...")
-    return True
+    return os.path.abspath(store_dir)
