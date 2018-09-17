@@ -4,7 +4,7 @@ from persistence import PickleWrapper
 
 # Geopy
 from geopy.geocoders import Nominatim
-geolocator = Nominatim()
+geolocator = Nominatim(user_agent="my-application")
 
 # Distances are measured in miles.
 # Longitudes and latitudes are measured in degrees.

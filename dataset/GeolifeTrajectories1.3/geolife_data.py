@@ -198,9 +198,9 @@ class GeoLifeData(object):
         if os.path.exists(img_file):
             return np.asarray(Image.open(img_file))
         else:
-            if self.debug:
-                print("Downloading feature at (lat={}, lng={})".format(
-                    lat, lng))
+            # if self.debug:
+            print("Downloading feature at (lat={}, lng={})".format(
+                lat, lng))
             zoom = self.feature_params["img_zoom"]
             size = self.feature_params["img_size"]
             maptype = self.feature_params["img_type"]
