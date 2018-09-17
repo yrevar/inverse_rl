@@ -49,6 +49,14 @@ def get_image_file_prefix(feature_params):
                         "_sz_" + size + "_latlng_")
 
 
+def store_img(img, file):
+
+    dirpath = os.path.dirname(file)
+    if not os.path.exists(dirpath):
+        os.makedirs(dirpath, exist_ok=True)
+    Image.fromarray(img).save(file)
+
+
 def download_state_features(latitude_levels, longitude_levels, feature_params):
 
     size = feature_params["img_size"]
@@ -64,7 +72,6 @@ def download_state_features(latitude_levels, longitude_levels, feature_params):
         for lng in longitude_levels:
             img = request_image_by_lat_lng(lat, lng,
                                            zoom, size, maptype, api_key)[0]
-            Image.fromarray(img).save(file_prefix
-                                      + str(lat) + "_" + str(lng) + ".jpg")
+            store_img(img, file_prefix + str(lat) + "_" + str(lng) + ".jpg")
     print("Download finished...")
     return os.path.abspath(store_dir)

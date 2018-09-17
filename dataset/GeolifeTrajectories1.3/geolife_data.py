@@ -205,8 +205,10 @@ class GeoLifeData(object):
             size = self.feature_params["img_size"]
             maptype = self.feature_params["img_type"]
             api_key = self.feature_params["gmaps_api_key"]
-            return MapsGoogle.request_image_by_lat_lng(
+            img = MapsGoogle.request_image_by_lat_lng(
                 lat, lng, zoom, size, maptype, api_key)[0]
+            MapsGoogle.store_img(img, img_file)
+            return img
 
     # ----------------------- #
     # --- GeoLife Parsing --- #
