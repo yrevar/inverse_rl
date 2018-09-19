@@ -56,7 +56,8 @@ class GeoLifeData(object):
                      img_size="128x128",
                      img_type="satellite",
                      img_zoom=18,
-                     gmaps_api_key=""),
+                     gmaps_api_key="",
+                     cache_dir="./features/"),
                  dataset_dir="../Data",
                  debug=False):
 
@@ -109,8 +110,11 @@ class GeoLifeData(object):
 
         # Features
         self.feature_params = feature_params
-        self.feature_params["data_dir"] = "./state_{}x{}_features/".format(
-            self.n_lat_states, self.n_lng_states)
+        self.feature_cache_dir = feature_params["cache_dir"]
+        self.feature_params["data_dir"] = os.path.join(
+            self.feature_cache_dir,
+            "state_{}x{}_features/".format(
+                self.n_lat_states, self.n_lng_states))
         self.img_file_prefix = MapsGoogle.get_image_file_prefix(
             self.feature_params)
         self.debug = debug
@@ -278,8 +282,7 @@ class GeoLifeData(object):
                             mask = (df_traj['date_time'] >= row["start_time"])\
                                 & (df_traj['date_time'] <= row["end_time"])
                             if sum(mask) > 0:
-                                df_traj.at[mask, "transport_mode"] = \
-                                    row["transport_mode"]
+                                df_traj.at[mask, "transport_mode"] = row["transport_mode"]
                     data.append(df_traj)
         return pd.concat(data, ignore_index=True)
 
