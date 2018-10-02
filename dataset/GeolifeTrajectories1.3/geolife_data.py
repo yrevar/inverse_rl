@@ -135,27 +135,29 @@ class GeoLifeData(object):
     # -------------------- #
     # --- Trajectories --- #
     # -------------------- #
-    def get_trajectories(self, min_traj_samples=100, smoothing_k=2400,
-                         stop_velocity=1e-8):
+    def get_trajectories(self, min_traj_samples=100, smoothing_k=40*60,
+                         stop_velocity=1e-6):
 
         traj_states_list = []
 
         for trip_id, df_trip in self.data.groupby("trip_id"):
-            df_trip_resampled = upsample_df(df_trip.set_index(
-                "date_time"), ["latitude", "longitude"], 'S', 'S')
-            a, b, c = self.split_traj_by_goals(
-                df_trip_resampled,
-                min_traj_samples=min_traj_samples,
-                smoothing_k=smoothing_k,
-                stop_velocity=stop_velocity,
-                latitude_levels=self.latitude_levels,
-                longitude_levels=self.longitude_levels)
-            traj_states_list.extend(b)
+
+            if len(df_trip) > min_traj_samples:
+                df_trip_resampled = upsample_df(df_trip.set_index(
+                    "date_time"), ["latitude", "longitude"], 'S', 'S')
+                a, b, c = self.split_traj_by_goals(
+                    df_trip_resampled,
+                    min_traj_samples=min_traj_samples,
+                    smoothing_k=smoothing_k,
+                    stop_velocity=stop_velocity,
+                    latitude_levels=self.latitude_levels,
+                    longitude_levels=self.longitude_levels)
+                traj_states_list.extend(b)
 
         traj_actions_list = []
         traj_mdp_states_list = []
         for traj_states in traj_states_list:
-            a_list, a_names = self.states_to_actions(traj_states)
+            a_list, a_names = self.states_to_9actions(traj_states)
             traj_actions_list.append(a_list)
             traj_mdp_states_list.append(
                 [NavigationWorldState(*s) for s in traj_states])
@@ -308,7 +310,7 @@ class GeoLifeData(object):
     # Split trip into sub-goal trajectories
     @staticmethod
     def split_traj_by_goals(df_trip, min_traj_samples=100, smoothing_k=1200,
-                            stop_velocity=1e-8, latitude_levels=None,
+                            stop_velocity=1e-7, latitude_levels=None,
                             longitude_levels=None, debug=False):
 
         tdiff = df_trip["date_time"].diff(1) / np.timedelta64(1, 's')
@@ -323,9 +325,12 @@ class GeoLifeData(object):
         instead of accumulating and giving false impression of motion.)
         """
         disp = np.sqrt(
-            df_trip["latitude"].rolling(smoothing_k).mean().diff(1)**2 +
-            df_trip["longitude"].rolling(smoothing_k).mean().diff(1)**2)
+            df_trip["latitude"].diff(smoothing_k)**2 +
+            df_trip["longitude"].diff(smoothing_k)**2)
         df_trip["velocity_smooth"] = disp / tdiff.rolling(smoothing_k).mean()
+        df_trip["velocity_smooth"] = df_trip["velocity_smooth"].shift(
+            -smoothing_k)
+
         # df["velocity_smooth2"] = df["velocity"].rolling(smoothing_k).mean()
         df_trip["traj_ind"] = ~np.signbit(
             np.abs(df_trip["velocity_smooth"])-stop_velocity)
@@ -386,7 +391,7 @@ class GeoLifeData(object):
     # --- Actions --- #
     # --------------- #
     @staticmethod
-    def states_to_actions(states_list):
+    def states_to_9actions(states_list):
 
         df_t = pd.DataFrame(states_list, columns=["lat", "lng"])
         df_t['lat_diff'] = df_t['lat'].diff(1)
