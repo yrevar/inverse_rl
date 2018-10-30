@@ -7,7 +7,7 @@ from torch.autograd import Variable
 
 
 def compute_policy(S, A, R, T, idx_to_s, gamma, n_iters,
-                   expl_policy, dtype, given_goal_idx=None, perf_debug=False):
+                   expl_policy, dtype, given_goal_idx=None):
 
     nS, nA = len(S), len(A)
     # Policy

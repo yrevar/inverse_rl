@@ -6,11 +6,13 @@ from PIL import Image
 from IPython import display
 import matplotlib.pyplot as plt
 
+
 def show_file_image(filename):
 
-    plt.figure(figsize=(12,12))
+    plt.figure(figsize=(12, 12))
     plt.imshow(plt.imread(filename))
     plt.axis('off')
+
 
 def read_pil_image_from_plt(plt):
 
@@ -19,9 +21,11 @@ def read_pil_image_from_plt(plt):
     buf.seek(0)
     return Image.open(buf)
 
-def create_gif(img_generator, gif_name="./.__gif_sample.gif", fps=10):
 
-    fig = plt.figure(figsize=(4,4))
+def create_gif(img_generator, cmap=plt.cm.viridis, gif_name="./.__gif_sample.gif", fps=10,
+               figsize=(4, 4), title=None):
+
+    fig = plt.figure(figsize=figsize)
     with imageio.get_writer(gif_name, mode='I', fps=fps) as writer:
 
         for img in img_generator():
@@ -29,9 +33,10 @@ def create_gif(img_generator, gif_name="./.__gif_sample.gif", fps=10):
             plt.gca().cla()
             ax = plt.gca()
             # Draw
-            plt.imshow(img)
+            plt.imshow(img, cmap=cmap)
             plt.xticks([])
             plt.yticks([])
+            plt.title(title)
             # Wait to draw - only for online visualization
             display.clear_output(wait=True)
             display.display(plt.gcf())
@@ -43,6 +48,8 @@ def create_gif(img_generator, gif_name="./.__gif_sample.gif", fps=10):
 
 # Adapted from: https://gist.github.com/extrospective/0f4fe69304184d813f982035d9684452
 # Actually it's the same function with a minor modification in how to select palatte colors
+
+
 def stacked_bar_chart(pivoted_df, stack_vals, level_values_field, chart_title, x_label, y_label, palette="pastel"):
     #
     # stacked_bar_chart: draws and saves a barchart figure to filename
@@ -77,21 +84,24 @@ def stacked_bar_chart(pivoted_df, stack_vals, level_values_field, chart_title, x
         sub_count = 0
         pivoted_df[stack_total_column] = 0
         stack_value = ""
-        for stack_value in stack_vals:  # for every item in the stack we create a new subset [stack_total_column] of 1 to N of the sub values
+        # for every item in the stack we create a new subset [stack_total_column] of 1 to N of the sub values
+        for stack_value in stack_vals:
             pivoted_df[stack_total_column] += pivoted_df[stack_value]  # sum up total
             sub_count += 1
-            if sub_count >= len(stack_vals) - bar_num:  # we skip out after a certain number of stack values
+            # we skip out after a certain number of stack values
+            if sub_count >= len(stack_vals) - bar_num:
                 break
         # now we have set the subtotal and can plot the bar.  reminder: each bar is overalpped by smaller subsequent bars starting from y=0 axis
         bar_plot = sns.barplot(data=pivoted_df, x=pivoted_df.index.get_level_values(level_values_field),
-                           y=stack_total_column, color=stack_color)
-        legend_rectangles.append(plt.Rectangle((0,0),1,1,fc=stack_color, edgecolor = 'none'))
-        legend_names.append(stack_value)   # the "last" stack_value is the name of that part of the stack
+                               y=stack_total_column, color=stack_color)
+        legend_rectangles.append(plt.Rectangle((0, 0), 1, 1, fc=stack_color, edgecolor='none'))
+        # the "last" stack_value is the name of that part of the stack
+        legend_names.append(stack_value)
         bar_num += 1
-    l = plt.legend(legend_rectangles, legend_names, loc=2, ncol = 1, prop={'size':12})
+    l = plt.legend(legend_rectangles, legend_names, loc=2, ncol=1, prop={'size': 12})
     l.draw_frame(False)
     bar_plot.set(xlabel=x_label, ylabel=y_label)
     plt.tight_layout()
     plt.title(chart_title)
     sns.despine(left=True)
-    #plt.savefig(filename)
+    # plt.savefig(filename)

@@ -1,16 +1,10 @@
-import abc
+class IRLProblem(object):
 
-
-class IRLProblem(abc.ABC):
-
-    @abc.abstractmethod
     def features(self, state):
-        pass
+        raise NotImplementedError
 
-    @abc.abstractmethod
     def sample_trajectories(self):
-        pass
+        raise NotImplementedError
 
-    @abc.abstractmethod
     def get_dynamics(self):
-        pass
+        raise NotImplementedError
