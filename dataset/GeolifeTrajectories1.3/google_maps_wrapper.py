@@ -15,7 +15,7 @@ plt.imshow(image)
 
 
 def request_image_by_query(query, zoom=18, size="100x100",
-                           maptype="satellite", api_key=""):
+                           maptype="satellite", api_key="", mode="RGB"):
     """
     Adapted from: http://drwelby.net/gstaticmaps/
     center= lat, lon or address
@@ -27,7 +27,7 @@ def request_image_by_query(query, zoom=18, size="100x100",
     url = "http://maps.googleapis.com/maps/api/staticmap?center={}&size={}&zoom={}&sensor=false&maptype={}&style=feature%3Aall%7Celement%3Alabels%7Cvisibility%3Aoff&key={}".format(
         query, size, zoom, maptype, api_key)
     img = Image.open(BytesIO(request.urlopen(url).read()))
-    return np.array(img.convert("RGB")), url
+    return np.array(img.convert(mode)), url
 
 
 def request_image_by_lat_lng(lat, lng, zoom=18,

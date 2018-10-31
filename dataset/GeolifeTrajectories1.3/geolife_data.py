@@ -139,6 +139,7 @@ class GeoLifeData(object):
                          stop_velocity=1e-6):
 
         traj_states_list = []
+        traj_dfs = []
 
         for trip_id, df_trip in self.data.groupby("trip_id"):
 
@@ -153,6 +154,7 @@ class GeoLifeData(object):
                     latitude_levels=self.latitude_levels,
                     longitude_levels=self.longitude_levels)
                 traj_states_list.extend(b)
+                traj_dfs.append(a)
 
         traj_actions_list = []
         traj_mdp_states_list = []
@@ -160,9 +162,9 @@ class GeoLifeData(object):
             a_list, a_names = self.states_to_9actions(traj_states)
             traj_actions_list.append(a_list)
             traj_mdp_states_list.append(
-                [NavigationWorldState(*s) for s in traj_states])
+                [NavigationWorldState(*s) for s in traj_states]) # x=latitude, y=longitude
 
-        return traj_states_list, traj_mdp_states_list, traj_actions_list
+        return traj_states_list, traj_mdp_states_list, traj_actions_list, traj_dfs
 
     # ---------------- #
     # --- Dynamics --- #
@@ -195,14 +197,14 @@ class GeoLifeData(object):
         self.img_file_prefix = MapsGoogle.download_state_features(
             self.latitude_levels, self.longitude_levels, self.feature_params)
 
-    def phi(self, state):
+    def phi(self, state, mode="L"):
 
         lat, lng = state[0], state[1]
         img_file = os.path.abspath(self.img_file_prefix + "{}_{}".format(
             lat, lng) + ".jpg")
 
         if os.path.exists(img_file):
-            return np.asarray(Image.open(img_file))
+            return np.asarray(Image.open(img_file).convert(mode))
         else:
             # if self.debug:
             print("Downloading feature at (lat={}, lng={})".format(
@@ -212,7 +214,7 @@ class GeoLifeData(object):
             maptype = self.feature_params["img_type"]
             api_key = self.feature_params["gmaps_api_key"]
             img = MapsGoogle.request_image_by_lat_lng(
-                lat, lng, zoom, size, maptype, api_key)[0]
+                lat, lng, zoom, size, maptype, api_key, mode)[0]
             MapsGoogle.store_img(img, img_file)
             return img
 
@@ -325,8 +327,8 @@ class GeoLifeData(object):
         instead of accumulating and giving false impression of motion.)
         """
         disp = np.sqrt(
-            df_trip["latitude"].diff(smoothing_k)**2 +
-            df_trip["longitude"].diff(smoothing_k)**2)
+            df_trip["latitude"].rolling(smoothing_k).mean().diff(1)**2 +
+            df_trip["longitude"].rolling(smoothing_k).mean().diff(1)**2)
         df_trip["velocity_smooth"] = disp / tdiff.rolling(smoothing_k).mean()
         df_trip["velocity_smooth"] = df_trip["velocity_smooth"].shift(
             -smoothing_k)
@@ -353,11 +355,23 @@ class GeoLifeData(object):
                 if (idx - start_idx) > min_traj_samples:
                     if debug:
                         print(idx, "end:", df_trip.iloc[idx]["date_time"])
-                    trajectories.append(df_trip[start_idx:idx].copy())
+
+                    # Remove samples with no spatial change (no "Stay" action)
+                    traj = df_trip[start_idx:idx].copy()
+                    traj.drop(index=traj[
+                        (traj['latitude_discrete'].diff(1).shift(-1) == 0) &
+                        (traj['longitude_discrete'].diff(1).shift(-1) ==
+                         0)].index, inplace=True)
+
+                    # drop trajectories with not enough samples
+                    if len(traj) < min_traj_samples:
+                        continue
+
+                    trajectories.append(traj)
                     if latitude_levels is not None\
                             and longitude_levels is not None:
                         traj_states_list.append([tuple(x) for x in
-                                                 df_trip[start_idx:idx][[
+                                                 traj[[
                                                      "latitude_discrete",
                                                      "longitude_discrete"
                                                  ]].squeeze().values])
@@ -370,12 +384,20 @@ class GeoLifeData(object):
             if debug:
                 print(len(df_trip)-1, "last:",
                       df_trip.iloc[len(df_trip)-1]["date_time"])
-            trajectories.append(df_trip[start_idx:].copy())
-            if latitude_levels is not None and longitude_levels is not None:
-                traj_states_list.append(
-                    [tuple(x) for x in df_trip[
-                        start_idx:][["latitude_discrete",
-                                     "longitude_discrete"]].squeeze().values])
+
+            traj = df_trip[start_idx:].copy()
+            traj.drop(index=traj[
+                (traj['latitude_discrete'].diff(1).shift(-1) == 0) &
+                (traj['longitude_discrete'].diff(1).shift(-1) ==
+                 0)].index, inplace=True)
+
+            if len(traj) >= min_traj_samples:
+                trajectories.append(traj)
+                if latitude_levels is not None and longitude_levels is not None:
+                    traj_states_list.append(
+                        [tuple(x) for x in traj[["latitude_discrete",
+                                                 "longitude_discrete"]
+                                                ].squeeze().values])
         if debug:
             df_trip["traj_ind"] = pd.to_numeric(
                 df_trip["traj_ind"]).astype(np.int)
@@ -394,8 +416,8 @@ class GeoLifeData(object):
     def states_to_9actions(states_list):
 
         df_t = pd.DataFrame(states_list, columns=["lat", "lng"])
-        df_t['lat_diff'] = df_t['lat'].diff(1)
-        df_t['lng_diff'] = df_t['lng'].diff(1)
+        df_t['lat_diff'] = df_t['lat'].diff(1).shift(-1)
+        df_t['lng_diff'] = df_t['lng'].diff(1).shift(-1)
         df_t["action"] = np.nan
         """
         (sign(lat), sign(lng))     -> Mapping

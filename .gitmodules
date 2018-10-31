@@ -1,0 +1,3 @@
+[submodule "utils_python"]
+	path = utils_python
+	url = https://github.com/yrevar/utils_python

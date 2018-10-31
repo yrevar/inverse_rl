@@ -63,21 +63,21 @@ def get_img_normalization_params(dataset):
         
     return mean, np.sqrt(var)
 
-def normalize_image(img, mu=0.2967633, std=0.19371898):
+def normalize_image(img, mu, std):
     return img.float().sub(mu).div(std)
 
-def unnormalize_image(img, mu=0.2967633, std=0.19371898):
+def unnormalize_image(img, mu, std):
     return img.mul(std).add(mu).clamp(0,1).mul(255).byte()
 
 def data_loader(pathname="./features/state_100x100_features/imgs_64x64/*.jpg", 
-                batch_size=64, shuffle=True, num_workers=4, drop_last=True, 
+                batch_size=64, shuffle=False, num_workers=4, drop_last=False, 
                 tr_va_te_split=[0.5, 0.3, 0.2], transform=transforms.Compose([
                     lambda x: np.asarray(x.convert("L"), np.uint8)/255.,
                     lambda x: torch.from_numpy(x),
                     normalize_image])):
     
     assert np.abs(sum(tr_va_te_split) - 1) < 1e-9
-        
+    
     dataset = ImageFolderDataset(pathname, img_loader=Image.open, transform=transform)
     
     n_tr = int(tr_va_te_split[0]*len(dataset))

@@ -27,7 +27,7 @@ class PickleWrapper(object):
             with open(self.results_file, 'rb') as fp:
                 self.obj = pickle.load(fp)
         else:
-            self.obj = {} #defaultdict(lambda: defaultdict(dict)) is best but not serializable through pickle
+            self.obj = {}
         return self.obj
 
 class ExperimentHelper(object):
@@ -63,8 +63,7 @@ class ExperimentHelper(object):
             
     def launch(self, here=globals()):
         here.update(self.config_dict)
-#         thismodule = sys.modules[__name__]
+        #         thismodule = sys.modules[__name__]
+        #         for k,v in self.config_dict.items():
+        #             setattr(thismodule, k, v)
         
-#         for k,v in self.config_dict.items():
-#             setattr(thismodule, k, v)
-            
