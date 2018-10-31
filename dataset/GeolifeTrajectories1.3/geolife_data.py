@@ -443,3 +443,69 @@ class GeoLifeData(object):
         df_t["action_str"] = df_t["action"].apply(
             lambda x: GeoLifeData.action_names[x] if not pd.isna(x) else "")
         return df_t["action_str"].values.tolist(), GeoLifeData.action_names
+
+def download_10x10_satimg128x128_features(gmaps_api_key, hdf_file):
+    
+    geolife_data = GeoLifeData(hdf_file_name=hdf_file,
+                                   transport_modes=["car"], 
+                                   feature_params=dict(
+                                     img_size="128x128",
+                                     img_type="satellite",
+                                     img_zoom=18,
+                                     gmaps_api_key=gmaps_api_key,
+                                     cache_dir="./features"),
+                                   n_lat_states=10,
+                                   n_lng_states=10,
+                                   debug=False)
+    geolife_data.precache_state_feature()
+    
+def download_100x100_satimg128x128_features(gmaps_api_key, hdf_file):
+    
+    geolife_data = GeoLifeData(hdf_file_name=hdf_file,
+                                   transport_modes=["car"], 
+                                   feature_params=dict(
+                                     img_size="128x128",
+                                     img_type="satellite",
+                                     img_zoom=18,
+                                     gmaps_api_key=gmaps_api_key,
+                                     cache_dir="./features"),
+                                   n_lat_states=100,
+                                   n_lng_states=100,
+                                   debug=False)
+    geolife_data.precache_state_feature()
+    
+def download_10x10_satimg64x64_features(gmaps_api_key, hdf_file):
+    
+    geolife_data = GeoLifeData(hdf_file_name=hdf_file,
+                                   transport_modes=["car"], 
+                                   feature_params=dict(
+                                     img_size="64x64",
+                                     img_type="satellite",
+                                     img_zoom=18,
+                                     gmaps_api_key=gmaps_api_key,
+                                     cache_dir="./features"),
+                                   n_lat_states=10,
+                                   n_lng_states=10,
+                                   debug=False)
+    geolife_data.precache_state_feature()
+    
+def download_100x100_satimg64x64_features(gmaps_api_key, hdf_file):
+    
+    geolife_data = GeoLifeData(hdf_file_name=hdf_file,
+                                   transport_modes=["car"], 
+                                   feature_params=dict(
+                                     img_size="64x64",
+                                     img_type="satellite",
+                                     img_zoom=18,
+                                     gmaps_api_key=gmaps_api_key,
+                                     cache_dir="./features"),
+                                   n_lat_states=100,
+                                   n_lng_states=100,
+                                   debug=False)
+    geolife_data.precache_state_feature()
+    
+if __name__ == "__main__":
+    
+    gmaps_api_key = "<google_maps_api_key>"
+    geolife_dataset_hdf_file = "./geolife_data_parsed.h5"
+    download_100x100_satimg_features(geolife_dataset_hdf_file)
