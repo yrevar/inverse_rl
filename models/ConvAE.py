@@ -34,14 +34,20 @@ class ConvAE(nn.Module):
     def __init__(self, input_dim, 
                  enc_config = [("conv1", 16), ("pool1", None), ("flatten1", None), ("linear1", 4096)],
                  verbose=False, disable_decoder=False, n_cuda_devices=8, store_activations=False, 
-                 states_file=None):
-        
+                 states_file=None, ae_skip_layers=0):
+        """
+        @params:
+            ae_skip_layers: Specifies number of layers to skip from the bottom of encoder and top of decoder. 
+        """
         super().__init__()
         self.input_dim = tuple(input_dim)
         self.img_C, self.img_H, self.img_W = self.input_dim
         self.verbose = verbose
         self.n_cuda_devices = n_cuda_devices
         self.store_activations = store_activations
+        self.disable_decoder = disable_decoder
+        self.ae_skip_layers = ae_skip_layers
+        
         self.enc_activations = []
         self.dec_activations = []
         
@@ -52,7 +58,6 @@ class ConvAE(nn.Module):
         
         if verbose: print("Enc dims: ", self.enc_layer_dims)
         
-        self.disable_decoder = disable_decoder
         # Decoder
         if not disable_decoder:
             self.dec_layers, self.dec_layer_names, self.dec_layer_dims = self.prepar_decoder(
@@ -69,11 +74,11 @@ class ConvAE(nn.Module):
         
     def forward(self, images):
         
-        code, pool_idxs = self.encode(images, ret_pool_idxs=True)
+        code, pool_idxs = self.encode(images, ret_pool_idxs=True, skip_layers=False)
         if self.disable_decoder:
             return code
         else:
-            out = self.tanh(self.decode(code, pool_idxs))
+            out = self.tanh(self.decode(code, pool_idxs=pool_idxs, skip_layers=False))
             return out, code
     
     def prepare_encoder(self, input_dim, enc_config):
@@ -128,15 +133,19 @@ class ConvAE(nn.Module):
         
         return layers, layer_names, layer_dims
         
-    def encode(self, x, ret_pool_idxs=False):
+    def encode(self, x, ret_pool_idxs=False, skip_layers=True):
         
         pool_idxs = []
         self.enc_activations = []
+        if skip_layers:
+            layer_end = -self.ae_skip_layers
+        else:
+            layer_end = None
         
         if self.store_activations:
             self.enc_activations.append(x)
         
-        for i, l in enumerate(self.encoder):
+        for i, l in enumerate(self.encoder[:layer_end]):
             if "Pool" in str(l):
                 x, idxs = l(x)
                 pool_idxs.append(idxs)
@@ -150,14 +159,21 @@ class ConvAE(nn.Module):
         else:
             return x
     
-    def decode(self, x, pool_idxs=None, return_activations=False):
+    def decode(self, x, pool_idxs=None, skip_layers=True):
         
         self.dec_activations = []
-        
+        if skip_layers:
+            layer_end = self.ae_skip_layers
+        else:
+            layer_end = None
+            
         if self.store_activations:
             self.dec_activations.append(x)
             
         for i, l in enumerate(self.decoder):
+            
+            if layer_end and i < layer_end:
+                continue
             
             if "Unpool" in str(l):
                 if pool_idxs is None:
@@ -181,11 +197,17 @@ class ConvAE(nn.Module):
     def get_decoder_activations(self):
         return self.dec_activations
     
-    def get_results_img(self, x, x_prime, nrows=8, padding=5):
+#     def get_results_img(self, x, x_prime, nrows=8, padding=5):
+        
+#         return utils.make_grid(
+#             torch.stack((x.long(), x_prime.long()), dim=1).view(-1, *self.input_dim),
+#             nrow=nrows, padding=padding).permute(2, 1, 0).cpu().numpy().astype(np.uint8)
+
+    def get_results_img(self, x, x_prime, nrow=8, padding=5):
         
         return utils.make_grid(
-            torch.stack((x.long(), x_prime.long()), dim=1).view(-1, *self.input_dim),
-            nrow=nrows, padding=padding).permute(2, 1, 0).cpu().numpy().astype(np.uint8)
+            torch.stack((x, x_prime), dim=1).view(-1,*self.input_dim),
+            nrow=nrow, padding=padding).permute(1,2,0)
     
     def create_layer(self, layer_name, out_dim, input_dim):
 

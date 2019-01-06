@@ -1,5 +1,6 @@
 import math
 import requests
+import pandas as pd
 from persistence import PickleWrapper
 
 # Geopy
@@ -9,7 +10,7 @@ geolocator = Nominatim(user_agent="my-application")
 # Distances are measured in miles.
 # Longitudes and latitudes are measured in degrees.
 # Earth is assumed to be perfectly spherical.
-earth_radius = 3960.0
+earth_radius = 3963.0
 degrees_to_radians = math.pi/180.0
 radians_to_degrees = 180.0/math.pi
 
@@ -68,11 +69,10 @@ def get_bbox(location=(0, 0), lat_span_miles=2, lng_span_miles=2):
     long_diff = change_in_longitude(lat, lng_span_miles) / 2.
     return lat - lat_diff, lat + lat_diff, long - long_diff, long + long_diff
 
-
-def select_region(data, address_query, lat_span_miles,
+def filter_region_points(data, address_query, lat_span_miles,
                   lng_span_miles, lat_col="latitude",
                   lng_col="longitude"):
-    """Crop dataframe centered at @address_queryself.
+    """Crop dataframe centered at @address_query.
 
     Returns:
         Filtered dataframe and bounding box coordinates.
@@ -83,3 +83,32 @@ def select_region(data, address_query, lat_span_miles,
 
     return data[(data[lat_col] > lat_min) & (data[lat_col] < lat_max) &
                 (data[lng_col] > long_min) & (data[lng_col] < long_max)], dict(lat_min=lat_min, lat_max=lat_max, long_min=long_min, long_max=long_max)
+
+def filter_region_trips(data, address_query, lat_span_miles,
+                  lng_span_miles, lat_col="latitude",
+                  lng_col="longitude", trip_col="trip_id"):
+    """Crop dataframe centered at @address_query.
+
+    Returns:
+        Filtered dataframe and bounding box coordinates.
+    """
+    lat, lng = get_location(address_query)
+    return df_crop_trips(data, lat, lng, lat_span_miles, lng_span_miles, lat_col, lng_col, trip_col)
+
+def df_crop_trips(data, lat, lng, lat_span_miles,lng_span_miles, lat_col="latitude", lng_col="longitude", trip_col="trip_id"):
+    
+    lat_min, lat_max, long_min, long_max = get_bbox(
+        (lat, lng), lat_span_miles, lng_span_miles)
+    
+    n_trips = 0
+    r_trips = 0
+    in_region_trips = []
+    for trip_id, df_trip in data.groupby(trip_col):
+        n_trips += 1
+        if df_trip["latitude"].min() >= lat_min and df_trip["latitude"].max() <= lat_max \
+            and df_trip["longitude"].min() >= long_min and df_trip["longitude"].max() <= long_max:
+                r_trips += 1
+                in_region_trips.append(df_trip)
+    print("Trips cropped: {}/{}".format(r_trips, n_trips))
+    return pd.concat(in_region_trips), dict(lat_min=lat_min, lat_max=lat_max, long_min=long_min, long_max=long_max)
+

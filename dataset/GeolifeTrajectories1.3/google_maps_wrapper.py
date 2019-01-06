@@ -14,7 +14,7 @@ plt.imshow(image)
 """
 
 
-def request_image_by_query(query, zoom=18, size="100x100",
+def request_np_image_by_query(query, zoom=18, size="100x100",
                            maptype="satellite", api_key="", mode="RGB"):
     """
     Adapted from: http://drwelby.net/gstaticmaps/
@@ -30,12 +30,33 @@ def request_image_by_query(query, zoom=18, size="100x100",
     return np.array(img.convert(mode)), url
 
 
+def request_np_image_by_lat_lng(lat, lng, zoom=18,
+                             size="100x100", maptype="satellite",
+                             api_key="", mode="RGB"):
+    return request_image_by_query("{},{}".format(lat, lng),
+                                  zoom, size, maptype, api_key, mode)
+
+def request_image_by_query(query, zoom=18, size="100x100",
+                           maptype="satellite", api_key=""):
+    """
+    Adapted from: http://drwelby.net/gstaticmaps/
+    center= lat, lon or address
+    zoom= 0 to 21
+    maptype= roadmap, satellite, hybrid, terrain
+    language= language code
+    visible= locations
+    """
+    url = "http://maps.googleapis.com/maps/api/staticmap?center={}&size={}&zoom={}&sensor=false&maptype={}&style=feature%3Aall%7Celement%3Alabels%7Cvisibility%3Aoff&key={}".format(
+        query, size, zoom, maptype, api_key)
+    img = Image.open(BytesIO(request.urlopen(url).read()))
+    return img, url
+
+
 def request_image_by_lat_lng(lat, lng, zoom=18,
                              size="100x100", maptype="satellite",
                              api_key=""):
     return request_image_by_query("{},{}".format(lat, lng),
                                   zoom, size, maptype, api_key)
-
 
 def get_image_file_prefix(feature_params):
 
@@ -70,8 +91,14 @@ def download_state_features(latitude_levels, longitude_levels, feature_params):
     print("Downloading images @ {}_<lat>_<lng>.jpg".format(file_prefix))
     for lat in latitude_levels:
         for lng in longitude_levels:
-            img = request_image_by_lat_lng(lat, lng,
-                                           zoom, size, maptype, api_key)[0]
-            store_img(img, file_prefix + str(lat) + "_" + str(lng) + ".jpg")
+
+            img_file = file_prefix + str(lat) + "_" + str(lng) + ".jpg"
+
+            if os.path.exists(img_file):
+                print("Skipping download. File exists: {} ".format(img_file))
+            else:
+                img = request_image_by_lat_lng(lat, lng,
+                                               zoom, size, maptype, api_key)[0]
+                store_img(img, img_file)
     print("Download finished...")
     return os.path.abspath(store_dir)

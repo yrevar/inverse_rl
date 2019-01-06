@@ -105,3 +105,95 @@ def stacked_bar_chart(pivoted_df, stack_vals, level_values_field, chart_title, x
     plt.title(chart_title)
     sns.despine(left=True)
     # plt.savefig(filename)
+
+    
+# Bokeh Google Maps
+from bokeh.io import output_file, show, output_notebook, save, export_png
+from bokeh.models import ColumnDataSource, GMapOptions
+from bokeh.plotting import gmap
+output_notebook()
+
+def show_img(filename):
+    plt.figure(figsize=(12,12))
+    plt.imshow(plt.imread(filename))
+    plt.axis('off')
+
+def show_p(p):
+    show(p)
+    
+def visualize_trajectory(lats, lngs, actions=None,
+                         file=None, render=False, p=None,
+                         fill_col=None, draw_col="black", fill_alpha=1., title="",
+                         font_size="6pt", dot_size=5, line_col=None, line_width=1.,
+                         plot_endpt=False, endpt_beta=3, endpt_line_width=1., 
+                         endpt_alpha=0.8, endpt_plot_fn=None, endpt_line_col=None,
+                         show_grid_fn=None,
+                         key=None, zoom=14, W=800, H=800):
+    
+    lats = np.asarray(lats)
+    lngs = np.asarray(lngs)
+    
+    if p is None:
+        map_options = GMapOptions(lat=np.median(lats), lng=np.median(lngs), map_type="satellite", zoom=zoom)
+        p = gmap(key, map_options, title=title, plot_width=W, plot_height=H)
+    
+    if show_grid_fn is not None:
+        show_grid_fn(p, np.vstack((lats, lngs)).transpose())
+        
+    if plot_endpt:
+        
+        endpt_source = ColumnDataSource(dict(x=[lngs[0], lngs[-1]], 
+                                        y=[lats[0], lats[-1]], 
+                                        colors=["green", "red"]))
+        
+        endpt_line_col = fill_col if endpt_line_col is None else endpt_line_col
+        if endpt_plot_fn is not None:
+            endpt_plot_fn("x", "y", size=endpt_beta*dot_size, line_color=endpt_line_col, 
+                          line_width=endpt_line_width*endpt_beta, fill_color="colors", 
+                          fill_alpha=int(endpt_alpha*endpt_beta), source=endpt_source)
+        else:
+            p.circle("x", "y", size=endpt_beta*dot_size, line_color=endpt_line_col, 
+                     line_width=int(endpt_alpha*endpt_beta), fill_color="colors", 
+                     fill_alpha=endpt_alpha, source=endpt_source)
+        
+    if actions is not None:
+        source = ColumnDataSource(
+            data=dict(lat=lats,
+                      lon=lngs,
+                      action=actions)
+            )
+        p.text(x="lon", y="lat", text="action", text_font_size=font_size, 
+                       text_color=draw_col, source=source)
+    else:
+        source = ColumnDataSource(
+            data=dict(lat=lats,
+                      lon=lngs)
+            )
+        p.circle(x="lon", y="lat", size=dot_size, fill_color=fill_col, line_color=draw_col, 
+                 fill_alpha=fill_alpha, source=source)
+        
+        if line_col:
+            p.line(x="lon", y="lat", line_color=line_col, line_width=line_width, source=source)
+    
+    if file is not None:
+        plt.close('all')
+        export_png(p, filename=file)
+        if render: show_img(file)
+    else:    
+        if render: show(p)
+    return p
+    
+def show_grid(p, lat_lvls, lng_lvls, lat_min, lat_max, lng_min, lng_max, 
+              vlines=True, hlines=True, line_color="white", alpha=0.7):
+    
+    if vlines:
+        for lat in lat_lvls:
+            if lat_min <= lat <= lat_max:
+                p.line( (lng_min, lng_max),  (lat, lat), line_color=line_color, line_alpha=alpha)
+    
+    if hlines:
+        for lng in lng_lvls:
+            if lng_min <= lng <= lng_max:
+                p.line( (lng, lng),  (lat_min, lat_max), line_color=line_color, line_alpha=alpha)
+                
+                

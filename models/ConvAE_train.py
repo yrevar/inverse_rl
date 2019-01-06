@@ -27,7 +27,56 @@ from pprint import pprint
 
 CONFIG_FILE = None
 EXP_FILE_BACKUP = True
+exp_config_dict = dict(
+    exp_title = "EXP_GEOLIFE_FEATURES_CONVAE_STRIDED_FINE_STATES_CHOPPED_TRAJ_RGB_DELETE",
+    identifier_prefix="",
+    identifier_suffix="",
+    identifier_params=["states",
+                       "img_size",
+                       "conv_k_size",
+                       "fc_latent_multiplier",
+                       "code_size",
+                       "strided_conv_freq",
+                       "lr",
+                       "weight_decay"],
 
+    # data
+    img_files_expr="../irl/mlirl/features/satellite_rgb/imgs_128x128/*.jpg",
+    img_size="64x64",
+    states="100x100",
+    batch_size=32,
+    drop_last=False,
+#     input_dim=(1, 64, 64),
+    input_dim=(3, 64, 64),
+    MU=0,  # .2963,
+    STD=1,  # 0.1986,
+
+    # performance
+    loss_criterion=nn.MSELoss(),
+    acc_criterion=lambda a, b: ConvAE.pearson_corr_coeff(a, b),
+
+    # training
+    lr=0.0001,
+    weight_decay=1e-9,
+    optimizer_fn=lambda params, lr, weight_decay: torch.optim.Adam(
+        params, lr=lr, weight_decay=weight_decay),
+    tr_va_te_split=[0.6, 0.3, 0.1],
+    n_epochs=30,
+
+    # compute
+    use_data_parallel=False,
+
+    # arch
+    nw_depth=6,
+    conv_k_size=16,
+    fc_latent_multiplier=4,
+    code_size=128,
+    strided_conv_freq=3,
+
+    # results
+    img_result_freq=5,
+    print_loss_freq=0,
+)
 def compute_prediction_performance(imgs_loader, model, perf_fn, device):
 
     # https://discuss.pytorch.org/t/how-can-we-release-gpu-memory-cache/14530
@@ -122,13 +171,18 @@ def convae_solver(
 
             result = model.get_results_img(GLImgs.unnormalize_image(images, MU, STD),
                                            GLImgs.unnormalize_image(output, MU, STD))
-            im = PIL.Image.fromarray(result.transpose(1, 0, 2))
+            im = PIL.Image.fromarray(np.asarray(result))
             im.save(os.path.join(results_dir, 'image_{}.png'.format(epoch+1)))
 
             fig = plt.figure(figsize=(20, 18))
             gridspec.GridSpec(5, 2)
             plt.subplot2grid((5, 2), (0, 0), colspan=1, rowspan=5)
-            plt.imshow(result.transpose(1, 0, 2), cmap="gray")
+            
+            if input_dim[0] == 1:
+                plt.imshow(np.asarray(result), cmap="gray")
+            else:
+                plt.imshow(np.asarray(result))
+                
             plt.title(msg)
             plt.xticks([]), plt.yticks([])
 
@@ -146,33 +200,12 @@ def convae_solver(
             plt.ylabel("Loss")
             plt.xlabel("Batch ({})".format(batch_size))
             plt.title(
-                title + "\n Best: train: {:.4f} val: {:.4f}".format(np.max(train_acc_history), np.max(val_acc_history)))
+                title + "\n Best: train loss: {:.4f}".format(np.min(loss_history)))
             plt.savefig(os.path.join(results_dir, 'summary_ep_{}.png'.format(epoch+1)))
             plt.close()
             # display.clear_output(wait=True)
             # display.display(plt.gcf())
     return loss_history, train_acc_history, val_acc_history
-
-
-def begin_experiment(experiment_title, exp_config):
-
-    exp_repro_file = None
-    if "backup_experiment_file" in exp_config and exp_config["backup_experiment_file"] == True:
-        exp_repro_file = "./{}/{}.py".format(experiment_title, experiment_title)
-        os.makedirs(os.path.dirname(exp_repro_file), exist_ok=True)
-        shutil.copy(__file__, exp_repro_file)
-
-    print("\n{}\nExperiment: {}\nConfig. file: {}\nReproduction file: {}\n{}".format(
-        "="*80, experiment_title, exp_config.store_file, exp_repro_file, "="*80))
-
-    exp_descr = ""
-    for param in exp_config["identifier_params"]:
-        exp_descr += "_" + str(param) + "_" + str(exp_config[param])
-        
-    exp_config.write("./{}/{}/config.p".format(experiment_title, exp_descr))
-    EXP_RESULTS = PersistentDictionary("./{}/results.p".format(EXPERIMENT_TITLE), verbose=False).write()
-
-    return exp_descr
 
 def get_experiment_dirname(exp_config):
     
@@ -197,48 +230,7 @@ if __name__ == "__main__":
         EXP_CONFIG = PersistentDictionary(CONFIG_FILE, True)
         EXP_DIR, EXP_ID = get_experiment_dirname(EXP_CONFIG)
     else:   
-        
-        EXP_CONFIG = PersistentDictionary(
-            None, verbose=True,
-            
-            exp_title = "EXP_GEOLIFE_FEATURES_CONVAE_STRIDED",
-            identifier_prefix="",
-            identifier_suffix="",
-            identifier_params=["states",
-                               "img_size",
-                               "conv_k_size",
-                               "fc_latent_multiplier",
-                               "code_size",
-                               "strided_conv_freq",
-                               "lr",
-                               "weight_decay"],
-            
-            img_files_expr= lambda st, sz: "../dataset/GeolifeTrajectories1.3/features/state_{}_features/imgs_{}/*.jpg".format(
-                st, sz),
-            img_size="64x64",
-            states="100x100",
-            batch_size=32,
-            drop_last=False,
-            loss_criterion=nn.MSELoss(),
-            lr=0.001,
-            weight_decay=1e-9,
-            optimizer_fn=lambda params, lr, weight_decay: torch.optim.Adam(
-                params, lr=lr, weight_decay=weight_decay),
-            acc_criterion=lambda a, b: ConvAE.pearson_corr_coeff(a, b),
-            use_data_parallel=False,
-            input_dim=(1, 64, 64),
-            tr_va_te_split=[0.6, 0.3, 0.1],
-            n_epochs=5,
-            nw_depth=6,
-            conv_k_size=16,
-            fc_latent_multiplier=4,
-            code_size=128,
-            img_result_freq=5,
-            print_loss_freq=0,
-            strided_conv_freq=3,
-            MU=0,  # .2963,
-            STD=1,  # 0.1986,
-        )
+        EXP_CONFIG = PersistentDictionary(None, verbose=True, **exp_config_dict)
         EXP_DIR, EXP_ID = get_experiment_dirname(EXP_CONFIG)
         EXP_CONFIG.write(os.path.join(EXP_DIR, "configs.p"))
         
@@ -273,7 +265,7 @@ if __name__ == "__main__":
     pprint(CONV_NW)
     
     print("Preparing Data..")
-    IMG_FILES = img_files_expr(states, img_size)
+    IMG_FILES = img_files_expr #(states, img_size)
     # dataset = GLImgs.ImageFolderDataset(IMG_FILES, transform=transforms.Compose([
     #                 lambda x: np.asarray(x.convert("L"), np.uint8),
     #                 lambda x: torch.from_numpy(x).float().div(255.)]))
@@ -281,13 +273,12 @@ if __name__ == "__main__":
     tr_loader, va_loader, te_loader = GLImgs.data_loader(
         IMG_FILES, batch_size=batch_size, drop_last=drop_last, tr_va_te_split=tr_va_te_split,
         transform=transforms.Compose([
-            lambda x: np.asarray(x.convert("L"), np.uint8),
+#             lambda x: np.asarray(x.convert("L"), np.uint8)[32:-32,32:-32,np.newaxis],
+            lambda x: np.asarray(x, np.uint8)[32:-32,32:-32,:],
             lambda x: torch.from_numpy(x).float().div(255.),
+            lambda x: x.permute(2,0,1),
             lambda x: GLImgs.normalize_image(x, MU, STD)]))
     
-    
-    
-
     print("Creating model..")
     # https://discuss.pytorch.org/t/how-can-we-release-gpu-memory-cache/14530
     # torch.cuda.empty_cache() # Needed for repeated experiments
