@@ -66,8 +66,8 @@ def sched_half_life(e_max, e_min, half_life, size=1e10, endless=False):
     return sched_exp_decay(e_max=e_max, e_min=e_min, lam=np.log(2)/half_life, size=size, endless=endless)
 
 def run_value_iteration(S, A, R, trans_fn, s_to_idx, boltzmann_temp, gamma, n_iters,
-                        dtype, S_lat_to_lng, given_goal_idx=None, given_start_idx=None, p_idx=None, 
-                        step_cost=0.0, verbose=False, terminal_cost=100, converge_eps=1e-6):
+                        dtype, S_lat_to_lng, given_goal_idx=None, p_idx=None, 
+                        verbose=False, converge_eps=1e-6):
     
     if verbose:
         print("Running VI x {}.. (goal idx: {})".format(
@@ -77,39 +77,36 @@ def run_value_iteration(S, A, R, trans_fn, s_to_idx, boltzmann_temp, gamma, n_it
     
     nS, nA = len(S), len(A)
     Pi = torch.ones(nS, nA, dtype=dtype) / nA
-    V = torch.tensor(R, dtype=dtype)
-    Q = torch.tensor(np.zeros((nS, nA)), dtype=dtype)
+    V = -1 * torch.ones(nS, dtype=dtype)
+    Q = -1 * torch.ones(nS, nA, dtype=dtype)
     
     # Given goal
     if given_goal_idx is not None:
         V[given_goal_idx] = 0
-        
-    if given_start_idx is not None:
-        V[given_start_idx] = -terminal_cost
-        
+  
     # Value iteration
     for iterno in range(n_iters):
         
         V_copy = V.clone()
-        
         for si, s in enumerate(S):
-            # No need to compute value for terminal and given goal states.
-            if si == given_goal_idx or si == given_start_idx:
-                continue
             
+            # No need to compute value for terminal and given goal states.
+            if si == given_goal_idx:
+                continue
+                
             for ai, a in enumerate(A):
                 
                 sp = trans_fn(s, a, S_lat_to_lng)
                 if sp is None: # outside envelope
-                    Q[si, ai] = - step_cost - terminal_cost
                     continue
                 else: 
                     if verbose:
                         print(s, "-", "{:5s}".format(a), "->", sp,
                               "R: ", float(R[si]),
                               "V_sp: ", gamma, V[s_to_idx[sp]].clone(), flush=True)
-                    Q[si, ai] = R[si] - step_cost + gamma * 1. * V[s_to_idx[sp]].clone()
-#             Pi[si, :] = boltzmann_dist(Q[si, :].clone(), boltzmann_temp_schedule[iterno])
+                    Q[si, ai] = R[si] + gamma * 1. * V[s_to_idx[sp]].clone()
+                    
+            # Pi[si, :] = boltzmann_dist(Q[si, :].clone(), boltzmann_temp_schedule[iterno])
             Pi[si, :] = boltzmann_dist(Q[si, :].clone(), boltzmann_temp)
             V[si] = Pi[si, :].clone().dot(Q[si, :].clone())
         
@@ -276,7 +273,7 @@ def MLIRL(
             loss_history.append(loss)
             
             if iter_handler and _iter==0:
-                iter_handler(_iter, loss_history, r_model, results_dir, dec_model)
+                iter_handler(_iter, loss_history, r_model, Pi_list, V_list, Q_list, results_dir, dec_model)
 
             # mlirl iter tock
             if debug and (_iter % print_interval == 0 or _iter == n_iter-1):
@@ -291,11 +288,11 @@ def MLIRL(
             r_optimizer.step()
             
             if iter_handler:
-                iter_handler(_iter+1, loss_history, r_model, results_dir, dec_model)
+                iter_handler(_iter+1, loss_history, r_model, Pi_list, V_list, Q_list, results_dir, dec_model)
                 
     # If interrupted, return current results
     except KeyboardInterrupt:
-        iter_handler(_iter, loss_history, r_model, results_dir, dec_model, interrupted=True)
+        iter_handler(_iter, loss_history, r_model, Pi_list, V_list, Q_list, results_dir, dec_model, training_interrupted=True)
         return r_model, loss_history, Pi_list, V_list, Q_list
     except:
         raise
