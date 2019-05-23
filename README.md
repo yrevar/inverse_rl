@@ -1,7 +1,7 @@
 # Environments
-Toy gridworld: https://github.com/yrevar/inverse_rl/blob/master/environments/MDPGridWorld_Experiment.ipynb  
-Navigation: https://github.com/yrevar/InverseRL/tree/master/Environments/NavigationGridWorld  
-Toy satellite gridworld: https://github.com/yrevar/InverseRL/tree/master/Environments/SatelliteGridWorld  
+Grid World: https://github.com/yrevar/inverse_rl/blob/master/environments/MDPGridWorld_Experiment.ipynb  
+Navigation World: https://github.com/yrevar/InverseRL/tree/master/Environments/NavigationGridWorld  
+Satellite Grid World: https://github.com/yrevar/InverseRL/tree/master/Environments/SatelliteGridWorld  
 
 # Inverse RL
 MaxEntropy IRL: https://github.com/yrevar/InverseRL/blob/master/MaxEntIRL/MaxEntIRL.py  
