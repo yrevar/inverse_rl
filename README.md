@@ -1,11 +1,11 @@
-![](http://williamorth1123.weebly.com/uploads/3/0/3/9/30394187/2553194_orig.gif)
-<br>Under Construction!  
-
 # Environments
-GridWorld MDP: https://github.com/yrevar/inverse_rl/blob/master/environments/MDPGridWorld_Experiment.ipynb  
+Grid World: https://github.com/yrevar/inverse_rl/blob/master/environments/MDPGridWorld_Experiment.ipynb  
+Navigation World: https://github.com/yrevar/InverseRL/tree/master/Environments/NavigationGridWorld  
+Satellite Grid World: https://github.com/yrevar/InverseRL/tree/master/Environments/SatelliteGridWorld  
 
 # Inverse RL
-MaxEntropy IRL: https://github.com/yrevar/inverse_rl/blob/master/irl/maxent/MaxEnt_Experiment.ipynb  
+MaxEntropy IRL: https://github.com/yrevar/InverseRL/blob/master/MaxEntIRL/MaxEntIRL.py  
+Maximum Likelihood IRL: https://github.com/yrevar/InverseRL/blob/master/MLIRL/MLIRL.py  
 Receding Horizon IRL (Tensorflow): https://github.com/yrevar/inverse_rl/blob/master/irl/rhirl/RHIRL_Navigation_Experiment.ipynb  
 
 # References
